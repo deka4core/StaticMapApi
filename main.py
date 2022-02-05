@@ -1,58 +1,54 @@
 import os
 import sys
 
+import pygame
 import requests
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel
 
-SCREEN_SIZE = [600, 450]
-
-
-class Example(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.getImage()
-        self.initUI()
-
-    def getImage(self):
-        coords = input("Координаты (x,y): ")
-        size = input("Коэффициент масштабирования (k): ")
-        map_request = "http://static-maps.yandex.ru/1.x/"
-        params = {"ll": coords,
-                  "spn": f"{size},{size}",
-                  "size": ','.join([str(x) for x in SCREEN_SIZE]),
-                  "l": "map"}
-        response = requests.get(map_request, params=params)
-
-        if not response:
-            print("Ошибка выполнения запроса:")
-            print(map_request)
-            print("Http статус:", response.status_code, "(", response.reason, ")")
-            sys.exit(1)
-
-        # Запишем полученное изображение в файл.
-        self.map_file = "map.png"
-        with open(self.map_file, "wb") as file:
-            file.write(response.content)
-
-    def initUI(self):
-        self.setGeometry(100, 100, *SCREEN_SIZE)
-        self.setWindowTitle('Отображение карты')
-
-        ## Изображение
-        self.pixmap = QPixmap(self.map_file)
-        self.image = QLabel(self)
-        self.image.move(0, 0)
-        self.image.resize(600, 450)
-        self.image.setPixmap(self.pixmap)
-
-    def closeEvent(self, event):
-        """При закрытии формы подчищаем за собой"""
-        os.remove(self.map_file)
+map_request = "http://static-maps.yandex.ru/1.x/"
+ll = input("Введите координаты в формате (x,y): ")
+spn = float(input("Введите коэффициент масштабирования: "))
+map_file = "map.png"
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = Example()
-    ex.show()
-    sys.exit(app.exec())
+def do_map(spn, map_file):
+    params = {"ll": ll,
+              "spn": f"{spn},{spn}",
+              "l": "map"}
+    response = requests.get(map_request, params=params)
+    if not response:
+        print("Ошибка выполнения запроса:")
+        print(map_request)
+        print("Http статус:", response.status_code, "(", response.reason, ")")
+        sys.exit(1)
+    # Запишем полученное изображение в файл.
+    with open(map_file, "wb") as file:
+        file.write(response.content)
+
+
+do_map(spn, map_file)
+# Инициализируем pygame
+pygame.init()
+screen = pygame.display.set_mode((600, 450))
+clock = pygame.time.Clock()
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_PAGEUP:
+                spn = spn * 2 if spn * 2 <= 50 else spn
+                do_map(spn, map_file)
+            elif event.key == pygame.K_PAGEDOWN:
+                spn = spn / 2 if spn / 2 >= 0.002 else spn
+                do_map(spn, map_file)
+    # Рисуем картинку, загружаемую из только что созданного файла.
+    screen.blit(pygame.image.load(map_file), (0, 0))
+    # Переключаем экран, и ждем закрытия окна.
+    pygame.display.flip()
+    clock.tick(10)
+
+pygame.quit()
+# Удаляем за собой файл с изображением.
+os.remove(map_file)
